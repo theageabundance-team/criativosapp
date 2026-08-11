@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import * as tus from "tus-js-client";
-import { createClient } from "@/lib/supabase/client";
+import { useUploadQueue } from "@/lib/uploadQueue";
 import { X, UploadCloud } from "lucide-react";
 import type { Platform } from "@/lib/types";
 
@@ -13,91 +12,16 @@ export default function UploadModal({
   onClose: () => void;
   onUploaded: () => void;
 }) {
-  const [file, setFile] = useState<File | null>(null);
-  const [name, setName] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [productName, setProductName] = useState("");
   const [platform, setPlatform] = useState<Platform>("meta");
   const [adAccountId, setAdAccountId] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const { enqueue } = useUploadQueue();
 
-  async function handleSubmit() {
-    if (!file) return setError("Escolha um arquivo");
-    setBusy(true);
-    setProgress(0);
-    setError(null);
-
-    const supabase = createClient();
-    const {
-      data: { session }
-    } = await supabase.auth.getSession();
-    const userId = session?.user.id;
-    if (!userId || !session) {
-      setError("Você precisa estar logado");
-      setBusy(false);
-      return;
-    }
-
-    const fileType = file.type.startsWith("video") ? "video" : "image";
-    const path = `${userId}/${Date.now()}-${file.name}`;
-
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const upload = new tus.Upload(file, {
-          endpoint: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/upload/resumable`,
-          retryDelays: [0, 3000, 5000, 10000, 20000],
-          headers: {
-            authorization: `Bearer ${session.access_token}`,
-            "x-upsert": "false"
-          },
-          uploadDataDuringCreation: true,
-          removeFingerprintOnSuccess: true,
-          metadata: {
-            bucketName: "creatives",
-            objectName: path,
-            contentType: file.type,
-            cacheControl: "3600"
-          },
-          chunkSize: 6 * 1024 * 1024,
-          onError: reject,
-          onProgress: (bytesUploaded, bytesTotal) => {
-            setProgress(Math.round((bytesUploaded / bytesTotal) * 100));
-          },
-          onSuccess: () => resolve()
-        });
-
-        upload.findPreviousUploads().then((previousUploads) => {
-          if (previousUploads.length) {
-            upload.resumeFromPreviousUpload(previousUploads[0]);
-          }
-          upload.start();
-        });
-      });
-    } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Falha no upload");
-      setBusy(false);
-      return;
-    }
-
-    const { error: insertError } = await supabase.from("creatives").insert({
-      owner_id: userId,
-      name: name || file.name,
-      file_path: path,
-      file_type: fileType,
-      platform,
-      product_name: productName || null,
-      ad_account_id: adAccountId || null,
-      status: "em_teste"
-    });
-
-    setBusy(false);
-    if (insertError) {
-      setError(insertError.message);
-      return;
-    }
-
-    onUploaded();
+  function handleSubmit() {
+    if (files.length === 0) return setError("Escolha ao menos um arquivo");
+    enqueue(files, { productName, platform, adAccountId }, onUploaded);
     onClose();
   }
 
@@ -114,22 +38,24 @@ export default function UploadModal({
         <label className="border border-dashed border-base-border rounded-lg p-6 flex flex-col items-center gap-2 cursor-pointer hover:border-signal-gold/60 transition-colors">
           <UploadCloud size={22} className="text-ink-muted" />
           <span className="text-sm text-ink-muted text-center">
-            {file ? file.name : "Clique para escolher um vídeo ou imagem"}
+            {files.length > 0
+              ? `${files.length} arquivo${files.length > 1 ? "s" : ""} selecionado${files.length > 1 ? "s" : ""}`
+              : "Clique para escolher vídeos ou imagens (pode selecionar vários)"}
           </span>
           <input
             type="file"
             accept="video/*,image/*"
+            multiple
             className="hidden"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
           />
         </label>
 
-        <input
-          className="bg-base-raised border border-base-border rounded-lg px-3 py-2 text-sm"
-          placeholder="Nome do criativo"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+        <p className="text-[11px] text-ink-muted -mt-2">
+          Os campos abaixo se aplicam a todos os arquivos selecionados. O nome de cada criativo é
+          tirado do nome do arquivo.
+        </p>
+
         <input
           className="bg-base-raised border border-base-border rounded-lg px-3 py-2 text-sm"
           placeholder="Produto (deve bater com o nome na Utmify)"
@@ -157,21 +83,11 @@ export default function UploadModal({
 
         {error && <p className="text-signal-coral text-xs">{error}</p>}
 
-        {busy && (
-          <div className="w-full h-2 rounded-full bg-base-raised overflow-hidden">
-            <div
-              className="h-full bg-signal-gold transition-all duration-150"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        )}
-
         <button
           onClick={handleSubmit}
-          disabled={busy}
-          className="bg-signal-gold text-base font-medium rounded-lg py-2 text-sm disabled:opacity-50"
+          className="bg-signal-gold text-base font-medium rounded-lg py-2 text-sm"
         >
-          {busy ? `Enviando... ${progress}%` : "Adicionar à biblioteca"}
+          Adicionar à biblioteca
         </button>
       </div>
     </div>

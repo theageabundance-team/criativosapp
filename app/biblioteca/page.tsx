@@ -66,7 +66,7 @@ export default function BibliotecaPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {creatives.map((c) => (
-          <CreativeCard key={c.id} creative={c} thumbnailUrl={c.file_type === "image" ? thumbs[c.id] : null} />
+          <CreativeCard key={c.id} creative={c} previewUrl={thumbs[c.id]} />
         ))}
       </div>
 

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
+import UploadTray from "@/components/UploadTray";
+import { UploadQueueProvider } from "@/lib/uploadQueue";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -31,10 +33,13 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <body className="font-body bg-base text-ink min-h-screen">
-        <div className="flex">
-          <Sidebar />
-          <main className="flex-1 min-h-screen">{children}</main>
-        </div>
+        <UploadQueueProvider>
+          <div className="flex">
+            <Sidebar />
+            <main className="flex-1 min-h-screen">{children}</main>
+          </div>
+          <UploadTray />
+        </UploadQueueProvider>
       </body>
     </html>
   );
