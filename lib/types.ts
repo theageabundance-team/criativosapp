@@ -14,9 +14,17 @@ export type Creative = {
   ad_account_id: string | null;
   external_ad_id: string | null;
   product_name: string | null;
+  folder_id: string | null;
   tags: string[];
   created_at: string;
   updated_at: string;
+};
+
+export type Folder = {
+  id: string;
+  owner_id: string;
+  name: string;
+  created_at: string;
 };
 
 export const STATUS_LABEL: Record<PipelineStatus, string> = {

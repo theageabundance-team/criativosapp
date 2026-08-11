@@ -17,6 +17,7 @@ export type UploadMeta = {
   productName: string;
   platform: Platform;
   adAccountId: string;
+  folderId: string | null;
 };
 
 type UploadQueueContextValue = {
@@ -97,6 +98,7 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
           platform: meta.platform,
           product_name: meta.productName || null,
           ad_account_id: meta.adAccountId || null,
+          folder_id: meta.folderId,
           status: "em_teste"
         });
 

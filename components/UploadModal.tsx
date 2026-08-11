@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useUploadQueue } from "@/lib/uploadQueue";
+import { useFolders } from "@/lib/useFolders";
+import FolderPicker from "@/components/FolderPicker";
 import { X, UploadCloud } from "lucide-react";
 import type { Platform } from "@/lib/types";
 
@@ -16,12 +18,14 @@ export default function UploadModal({
   const [productName, setProductName] = useState("");
   const [platform, setPlatform] = useState<Platform>("meta");
   const [adAccountId, setAdAccountId] = useState("");
+  const [folderId, setFolderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { enqueue } = useUploadQueue();
+  const { folders, createFolder } = useFolders();
 
   function handleSubmit() {
     if (files.length === 0) return setError("Escolha ao menos um arquivo");
-    enqueue(files, { productName, platform, adAccountId }, onUploaded);
+    enqueue(files, { productName, platform, adAccountId, folderId }, onUploaded);
     onClose();
   }
 
@@ -55,6 +59,13 @@ export default function UploadModal({
           Os campos abaixo se aplicam a todos os arquivos selecionados. O nome de cada criativo é
           tirado do nome do arquivo.
         </p>
+
+        <FolderPicker
+          folders={folders}
+          value={folderId}
+          onChange={setFolderId}
+          onCreateFolder={createFolder}
+        />
 
         <input
           className="bg-base-raised border border-base-border rounded-lg px-3 py-2 text-sm"

@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { downloadCreative } from "@/lib/download";
+import { useFolders } from "@/lib/useFolders";
+import FolderPicker from "@/components/FolderPicker";
 import type { Creative, PipelineStatus, Platform } from "@/lib/types";
 import { STATUS_LABEL } from "@/lib/types";
 import { ArrowLeft, Download } from "lucide-react";
@@ -29,6 +31,7 @@ export default function CreativeDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const { folders, createFolder } = useFolders();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,6 +134,16 @@ export default function CreativeDetailPage() {
           </button>
 
           <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1 text-xs text-ink-muted col-span-2">
+              Pasta
+              <FolderPicker
+                folders={folders}
+                value={creative.folder_id}
+                onChange={(folderId) => updateField("folder_id", folderId)}
+                onCreateFolder={createFolder}
+              />
+            </label>
+
             <label className="flex flex-col gap-1 text-xs text-ink-muted">
               Status
               <select
