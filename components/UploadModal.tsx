@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import * as tus from "tus-js-client";
 import { createClient } from "@/lib/supabase/client";
 import { X, UploadCloud } from "lucide-react";
 import type { Platform } from "@/lib/types";
@@ -18,17 +19,21 @@ export default function UploadModal({
   const [platform, setPlatform] = useState<Platform>("meta");
   const [adAccountId, setAdAccountId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit() {
     if (!file) return setError("Escolha um arquivo");
     setBusy(true);
+    setProgress(0);
     setError(null);
 
     const supabase = createClient();
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId) {
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+    const userId = session?.user.id;
+    if (!userId || !session) {
       setError("Você precisa estar logado");
       setBusy(false);
       return;
@@ -37,9 +42,40 @@ export default function UploadModal({
     const fileType = file.type.startsWith("video") ? "video" : "image";
     const path = `${userId}/${Date.now()}-${file.name}`;
 
-    const { error: uploadError } = await supabase.storage.from("creatives").upload(path, file);
-    if (uploadError) {
-      setError(uploadError.message);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const upload = new tus.Upload(file, {
+          endpoint: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/upload/resumable`,
+          retryDelays: [0, 3000, 5000, 10000, 20000],
+          headers: {
+            authorization: `Bearer ${session.access_token}`,
+            "x-upsert": "false"
+          },
+          uploadDataDuringCreation: true,
+          removeFingerprintOnSuccess: true,
+          metadata: {
+            bucketName: "creatives",
+            objectName: path,
+            contentType: file.type,
+            cacheControl: "3600"
+          },
+          chunkSize: 6 * 1024 * 1024,
+          onError: reject,
+          onProgress: (bytesUploaded, bytesTotal) => {
+            setProgress(Math.round((bytesUploaded / bytesTotal) * 100));
+          },
+          onSuccess: () => resolve()
+        });
+
+        upload.findPreviousUploads().then((previousUploads) => {
+          if (previousUploads.length) {
+            upload.resumeFromPreviousUpload(previousUploads[0]);
+          }
+          upload.start();
+        });
+      });
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Falha no upload");
       setBusy(false);
       return;
     }
@@ -121,12 +157,21 @@ export default function UploadModal({
 
         {error && <p className="text-signal-coral text-xs">{error}</p>}
 
+        {busy && (
+          <div className="w-full h-2 rounded-full bg-base-raised overflow-hidden">
+            <div
+              className="h-full bg-signal-gold transition-all duration-150"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
+
         <button
           onClick={handleSubmit}
           disabled={busy}
           className="bg-signal-gold text-base font-medium rounded-lg py-2 text-sm disabled:opacity-50"
         >
-          {busy ? "Enviando..." : "Adicionar à biblioteca"}
+          {busy ? `Enviando... ${progress}%` : "Adicionar à biblioteca"}
         </button>
       </div>
     </div>
