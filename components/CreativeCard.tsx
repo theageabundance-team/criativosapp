@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { Creative, STATUS_COLOR, STATUS_LABEL } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { downloadCreative } from "@/lib/download";
@@ -32,10 +34,21 @@ export default function CreativeCard({
     }
   }
 
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: creative.id
+  });
+
   return (
     <Link
+      ref={setNodeRef}
       href={`/biblioteca/${creative.id}`}
-      className="rounded-xl border border-base-border bg-base-surface overflow-hidden group block"
+      style={{ transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.4 : 1 }}
+      className={clsx(
+        "rounded-xl border border-base-border bg-base-surface overflow-hidden group block touch-none",
+        isDragging && "z-50 shadow-xl"
+      )}
+      {...listeners}
+      {...attributes}
     >
       <div className="relative aspect-[4/5] bg-base-raised flex items-center justify-center">
         {previewUrl ? (
